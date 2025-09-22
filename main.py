@@ -897,6 +897,8 @@ async def get_job_status(job_id: str):
     
     return BacklinkResponse(**job_results[job_id])
 
+# Replace the upload_file function with this:
+
 @app.post("/upload-file")
 async def upload_file(file: UploadFile = File(...)):
     """Upload CSV or Excel file and extract URLs from 'submitted url' column"""
@@ -906,41 +908,73 @@ async def upload_file(file: UploadFile = File(...)):
     try:
         contents = await file.read()
         
-        # Handle Excel files
+        # Handle Excel files without pandas
         if file.filename.lower().endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(io.BytesIO(contents))
+            from openpyxl import load_workbook
+            
+            workbook = load_workbook(io.BytesIO(contents))
+            sheet = workbook.active
+            
+            # Get headers from first row
+            headers = [cell.value for cell in sheet[1]]
+            
+            # Find URL column
+            url_column_index = None
+            url_column_name = None
+            for i, header in enumerate(headers):
+                if header and any(keyword in str(header).lower() for keyword in [
+                    'submitted url', 'submitted_url', 'submittedurl',
+                    'url', 'website', 'link', 'domain', 'site'
+                ]):
+                    url_column_index = i
+                    url_column_name = str(header)
+                    break
+            
+            if url_column_index is None:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"No URL column found. Available columns: {[str(h) for h in headers if h]}. "
+                           f"Expected column names: 'submitted url', 'url', 'website', 'link', etc."
+                )
+            
+            # Extract URLs
+            urls = []
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                if len(row) > url_column_index and row[url_column_index]:
+                    urls.append(str(row[url_column_index]))
+                    
         else:
             # Handle CSV files
-            df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+            import csv
+            
+            csv_content = contents.decode('utf-8')
+            csv_reader = csv.DictReader(io.StringIO(csv_content))
+            
+            # Find URL column
+            headers = csv_reader.fieldnames
+            url_column_name = None
+            for header in headers:
+                if any(keyword in header.lower() for keyword in [
+                    'submitted url', 'submitted_url', 'submittedurl',
+                    'url', 'website', 'link', 'domain', 'site'
+                ]):
+                    url_column_name = header
+                    break
+            
+            if not url_column_name:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"No URL column found. Available columns: {headers}. "
+                           f"Expected column names: 'submitted url', 'url', 'website', 'link', etc."
+                )
+            
+            # Extract URLs
+            urls = []
+            for row in csv_reader:
+                if row[url_column_name]:
+                    urls.append(str(row[url_column_name]))
         
-        # Look for URL column
-        url_columns = []
-        for col in df.columns:
-            col_lower = col.lower().strip()
-            if any(keyword in col_lower for keyword in [
-                'submitted url', 'submitted_url', 'submittedurl',
-                'url', 'website', 'link', 'domain', 'site'
-            ]):
-                url_columns.append(col)
-        
-        if not url_columns:
-            available_columns = list(df.columns)
-            raise HTTPException(
-                status_code=400, 
-                detail=f"No URL column found. Available columns: {available_columns}. "
-                       f"Expected column names: 'submitted url', 'url', 'website', 'link', etc."
-            )
-        
-        # Use the first matching column (prioritize 'submitted url')
-        url_column = url_columns[0]
-        for col in url_columns:
-            if 'submitted' in col.lower():
-                url_column = col
-                break
-        
-        # Extract and clean URLs
-        urls = df[url_column].dropna().astype(str).tolist()
-        
+        # Clean URLs
         cleaned_urls = []
         for url in urls:
             url = url.strip()
@@ -952,25 +986,22 @@ async def upload_file(file: UploadFile = File(...)):
         if not cleaned_urls:
             raise HTTPException(
                 status_code=400, 
-                detail=f"No valid URLs found in column '{url_column}'"
+                detail=f"No valid URLs found in column '{url_column_name}'"
             )
         
         return {
-            "message": f"Successfully loaded {len(cleaned_urls)} URLs from column '{url_column}'",
+            "message": f"Successfully loaded {len(cleaned_urls)} URLs from column '{url_column_name}'",
             "urls": cleaned_urls,
             "total_count": len(cleaned_urls),
-            "column_used": url_column,
+            "column_used": url_column_name,
             "file_type": "Excel" if file.filename.lower().endswith(('.xlsx', '.xls')) else "CSV",
-            "available_columns": list(df.columns)
+            "available_columns": headers if isinstance(headers, list) else [str(h) for h in headers if h]
         }
         
-    except pd.errors.EmptyDataError:
-        raise HTTPException(status_code=400, detail="File is empty or corrupted")
-    except pd.errors.ParserError as e:
-        raise HTTPException(status_code=400, detail=f"Error parsing file: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
+# Remove the duplicate verify_backlink method and incomplete functions at the end
 @app.post("/verify/stream")
 async def verify_backlinks_stream(request: BacklinkRequest):
     """Stream verification results live as each URL is processed"""
@@ -1079,31 +1110,3 @@ async def verify_backlinks_stream(request: BacklinkRequest):
             "Content-Type": "text/event-stream"
         }
     )
-    """Debug endpoint to see what content the API extracts from a page"""
-    try:
-        verifier = BacklinksVerifier()
-        result = verifier.fetch_page_content(url)
-        
-        if result['success']:
-            return {
-                "url": url,
-                "status_code": result['status_code'],
-                "text_content_length": len(result['text_content']),
-                "text_preview": result['text_content'][:1000],  # First 1000 chars
-                "html_content_length": len(result['html_content']),
-                "html_preview": result['html_content'][:1000],  # First 1000 chars
-                "final_url": result.get('url', url)
-            }
-        else:
-            return {
-                "url": url,
-                "error": result['error'],
-                "status_code": result.get('status_code')
-            }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/debug-page")
-async def debug_page_content(url: str):
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
