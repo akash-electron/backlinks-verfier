@@ -20,13 +20,13 @@ import io
 import os
 
 # Selenium imports for JavaScript content
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, WebDriverException
-from webdriver_manager.chrome import ChromeDriverManager
+# from selenium import webdriver
+# from selenium.webdriver.chrome.options import Options
+# from selenium.webdriver.common.by import By
+# from selenium.webdriver.support.ui import WebDriverWait
+# from selenium.webdriver.support import expected_conditions as EC
+# from selenium.common.exceptions import TimeoutException, WebDriverException
+# from webdriver_manager.chrome import ChromeDriverManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -60,7 +60,8 @@ class BacklinkRequest(BaseModel):
     delay: float = Field(default=1.0, ge=0.5, le=5.0, description="Delay between requests")
     max_workers: int = Field(default=3, ge=1, le=10, description="Max concurrent requests")
     debug: bool = Field(default=False, description="Enable debug logging")
-    use_browser: bool = Field(default=False, description="Use browser for JavaScript-rendered content")
+    # use_browser: bool = Field(default=False, description="Use browser for JavaScript-rendered content")
+    use_browser: bool = Field(default=False, description="Browser mode not available")
     
     @validator('urls')
     def validate_urls(cls, v):
@@ -114,50 +115,50 @@ class BacklinksVerifier:
         self.session.mount("https://", adapter)
         
         # Initialize browser if needed
-        if self.use_browser:
-            self.init_browser()
+        # if self.use_browser:
+            # self.init_browser()
     
-    def init_browser(self):
-        """Initialize Selenium WebDriver with stealth options"""
-        try:
-            chrome_options = Options()
+    # def init_browser(self):
+    #     """Initialize Selenium WebDriver with stealth options"""
+    #     try:
+    #         chrome_options = Options()
             
-            # Make browser look more human-like
-            chrome_options.add_argument('--no-sandbox')
-            chrome_options.add_argument('--disable-dev-shm-usage')
-            chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-            chrome_options.add_experimental_option('useAutomationExtension', False)
-            chrome_options.add_argument('--disable-web-security')
-            chrome_options.add_argument('--allow-running-insecure-content')
-            chrome_options.add_argument('--disable-features=VizDisplayCompositor')
+    #         # Make browser look more human-like
+    #         chrome_options.add_argument('--no-sandbox')
+    #         chrome_options.add_argument('--disable-dev-shm-usage')
+    #         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    #         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    #         chrome_options.add_experimental_option('useAutomationExtension', False)
+    #         chrome_options.add_argument('--disable-web-security')
+    #         chrome_options.add_argument('--allow-running-insecure-content')
+    #         chrome_options.add_argument('--disable-features=VizDisplayCompositor')
             
-            # Use a real user agent
-            user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            chrome_options.add_argument(f'--user-agent={user_agent}')
+    #         # Use a real user agent
+    #         user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    #         chrome_options.add_argument(f'--user-agent={user_agent}')
             
-            # Set window size to common resolution
-            chrome_options.add_argument('--window-size=1920,1080')
+    #         # Set window size to common resolution
+    #         chrome_options.add_argument('--window-size=1920,1080')
             
-            # Comment out headless mode to see what's happening (optional)
-            # chrome_options.add_argument('--headless')  # Temporarily disable for debugging
+    #         # Comment out headless mode to see what's happening (optional)
+    #         # chrome_options.add_argument('--headless')  # Temporarily disable for debugging
             
-            # Install and use ChromeDriver
-            self.driver = webdriver.Chrome(
-                service=webdriver.chrome.service.Service(ChromeDriverManager().install()),
-                options=chrome_options
-            )
+    #         # Install and use ChromeDriver
+    #         self.driver = webdriver.Chrome(
+    #             service=webdriver.chrome.service.Service(ChromeDriverManager().install()),
+    #             options=chrome_options
+    #         )
             
-            # Execute script to hide automation indicators
-            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+    #         # Execute script to hide automation indicators
+    #         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             
-            self.driver.set_page_load_timeout(self.timeout + 10)
-            logger.info("Stealth browser initialized successfully")
+    #         self.driver.set_page_load_timeout(self.timeout + 10)
+    #         logger.info("Stealth browser initialized successfully")
             
-        except Exception as e:
-            logger.error(f"Failed to initialize browser: {e}")
-            self.use_browser = False
-            self.driver = None
+    #     except Exception as e:
+    #         logger.error(f"Failed to initialize browser: {e}")
+    #         self.use_browser = False
+    #         self.driver = None
     
     def close_browser(self):
         """Close the browser"""
