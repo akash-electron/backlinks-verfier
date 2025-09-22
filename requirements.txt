@@ -2,7 +2,6 @@ fastapi==0.100.0
 uvicorn[standard]==0.23.0
 requests==2.31.0
 beautifulsoup4==4.12.2
-pandas==2.0.3
 python-multipart==0.0.6
 pydantic==1.10.12
 openpyxl==3.1.2

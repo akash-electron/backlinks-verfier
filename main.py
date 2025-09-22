@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict, Any, Iterator
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
 from urllib.parse import urlparse
 import time
 import random
