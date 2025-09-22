@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backlinks Verifier</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            max-width: 800px; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 0 auto;
+        }
+        h1 { 
+            color: #333; 
+            text-align: center; 
+            margin-bottom: 30px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #fafafa;
+        }
+        input[type="file"] { 
+            margin: 10px 0; 
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+        }
+        input[type="text"] { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            box-sizing: border-box;
+        }
+        button { 
+            background: #007bff; 
+            color: white; 
+            padding: 12px 20px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            margin: 10px 5px;
+            min-width: 150px;
+        }
+        button:hover { 
+            background: #0056b3; 
+        }
+        button:disabled { 
+            background: #ccc; 
+            cursor: not-allowed; 
+        }
+        .test-btn {
+            background: #28a745;
+            margin-bottom: 20px;
+        }
+        .test-btn:hover {
+            background: #218838;
+        }
+        .results { 
+            margin-top: 20px; 
+            padding: 15px; 
+            border-radius: 4px; 
+            min-height: 50px;
+        }
+        .success { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb;
+        }
+        .error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 1px solid #f5c6cb;
+        }
+        .loading { 
+            background: #cce7ff; 
+            color: #004085; 
+            border: 1px solid #99d1ff;
+        }
+        .progress-container {
+            margin: 20px 0;
+            display: none;
+        }
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 25px;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            background: #007bff;
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .live-results {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            border: 1px solid #dee2e6;
+            white-space: pre-wrap;
+        }
+        .status {
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Backlinks Verifier</h1>
+        
+        <!-- API Test -->
+        <div class="section">
+            <h3>🔌 API Connection</h3>
+            <button class="test-btn" onclick="testAPI()">Test API Connection</button>
+            <div id="apiStatus">Click to test API connection</div>
+        </div>
+
+        <!-- File Upload -->
+        <div class="section">
+            <h3>📊 Upload Excel/CSV File</h3>
+            <p>Upload file with "submitted url" column</p>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+            <button onclick="uploadFile()">📤 Upload File</button>
+            <div id="uploadResult"></div>
+        </div>
+
+        <!-- Search Settings -->
+        <div class="section">
+            <h3>🔍 Search Settings</h3>
+            <label><strong>Search Term:</strong></label>
+            <input type="text" id="searchTerm" placeholder="https://www.gulbhahar.com" value="https://www.gulbhahar.com">
+            
+            <div style="margin: 15px 0;">
+                <label><input type="checkbox" id="useBrowser"> Use Browser Mode (for JavaScript sites)</label><br>
+                <label><input type="checkbox" id="debugMode"> Debug Mode</label>
+            </div>
+        </div>
+
+        <!-- Verification -->
+        <div class="section">
+            <h3>⚡ Verification</h3>
+            <button onclick="startVerification()" id="verifyBtn" disabled>🚀 Start Live Verification</button>
+            
+            <!-- Progress -->
+            <div class="progress-container" id="progressContainer">
+                <div class="status" id="currentStatus">Ready to start...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill">0%</div>
+                </div>
+                <div class="live-results" id="liveResults"></div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div id="finalResults"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let extractedUrls = [];
+
+        // Test API connection
+        function testAPI() {
+            const status = document.getElementById('apiStatus');
+            status.innerHTML = '⏳ Testing connection...';
+            status.style.color = '#666';
+
+            fetch(`${API_URL}/health`)
+                .then(response => {
+                    if (response.ok) {
+                        status.innerHTML = '✅ API Connected Successfully!';
+                        status.style.color = 'green';
+                        return response.json();
+                    } else {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                })
+                .then(data => {
+                    console.log('API Response:', data);
+                })
+                .catch(error => {
+                    status.innerHTML = `❌ Connection Failed: ${error.message}`;
+                    status.style.color = 'red';
+                    console.error('API test failed:', error);
+                });
+        }
+
+        // Upload file
+        function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            const resultDiv = document.getElementById('uploadResult');
+
+            if (!file) {
+                resultDiv.innerHTML = '<div class="results error">❌ Please select a file first</div>';
+                return;
+            }
+
+            // Check file extension
+            const fileName = file.name.toLowerCase();
+            if (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
+                resultDiv.innerHTML = '<div class="results error">❌ Please upload a CSV, XLSX, or XLS file</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="results loading">📤 Uploading file...</div>';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch(`${API_URL}/upload-file`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(text);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                extractedUrls = data.urls;
+                resultDiv.innerHTML = `
+                    <div class="results success">
+                        ✅ <strong>Upload Successful!</strong><br>
+                        📊 Loaded <strong>${data.total_count}</strong> URLs from column "<strong>${data.column_used}</strong>"<br>
+                        📁 File type: <strong>${data.file_type}</strong>
+                    </div>
+                `;
+                
+                // Enable verification button
+                document.getElementById('verifyBtn').disabled = false;
+            })
+            .catch(error => {
+                console.error('Upload error:', error);
+                let errorMsg = error.message;
+                try {
+                    const errorData = JSON.parse(errorMsg);
+                    errorMsg = errorData.detail || errorMsg;
+                } catch (e) {
+                    // Keep original error message
+                }
+                resultDiv.innerHTML = `<div class="results error">❌ Upload failed: ${errorMsg}</div>`;
+            });
+        }
+
+        // Start verification
+        function startVerification() {
+            if (extractedUrls.length === 0) {
+                alert('Please upload a file first!');
+                return;
+            }
+
+            const searchTerm = document.getElementById('searchTerm').value.trim();
+            if (!searchTerm) {
+                alert('Please enter a search term!');
+                return;
+            }
+
+            // Show progress container
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('liveResults').innerHTML = '';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressFill').innerHTML = '0%';
+            document.getElementById('currentStatus').innerHTML = '🚀 Starting verification...';
+
+            const useBrowser = document.getElementById('useBrowser').checked;
+            const debugMode = document.getElementById('debugMode').checked;
+
+            const requestData = {
+                urls: extractedUrls,
+                search_term: searchTerm,
+                use_browser: useBrowser,
+                debug: debugMode
+            };
+
+            // Start streaming verification
+            fetch(`${API_URL}/verify/stream`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                function readStream() {
+                    return reader.read().then(({ done, value }) => {
+                        if (done) return;
+
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\n');
+
+                        lines.forEach(line => {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(line.slice(6));
+                                    handleStreamData(data);
+                                } catch (e) {
+                                    console.error('Error parsing stream data:', e);
+                                }
+                            }
+                        });
+
+                        return readStream();
+                    });
+                }
+
+                return readStream();
+            })
+            .catch(error => {
+                console.error('Verification failed:', error);
+                document.getElementById('currentStatus').innerHTML = `❌ Error: ${error.message}`;
+            });
+        }
+
+        // Handle streaming data
+        function handleStreamData(data) {
+            const statusDiv = document.getElementById('currentStatus');
+            const progressFill = document.getElementById('progressFill');
+            const liveResults = document.getElementById('liveResults');
+
+            if (data.status === 'started') {
+                statusDiv.innerHTML = `🚀 Started verification of ${data.total_urls} URLs`;
+            }
+            else if (data.status === 'processing') {
+                const progress = Math.round((data.progress / data.total) * 100);
+                progressFill.style.width = `${progress}%`;
+                progressFill.innerHTML = `${progress}%`;
+                statusDiv.innerHTML = `⏳ Processing ${data.progress}/${data.total}: ${data.current_url}`;
+            }
+            else if (data.type === 'result') {
+                const result = data.result;
+                const timestamp = new Date().toLocaleTimeString();
+                const status = result.verified ? '✅' : '❌';
+                
+                let resultText = `[${timestamp}] ${status} ${result.url}\n`;
+                
+                if (result.verified) {
+                    resultText += `    ✓ Found: ${result.found_variation} in ${result.found_in}\n`;
+                    if (result.context) {
+                        resultText += `    📝 Context: ${result.context.substring(0, 150)}...\n`;
+                    }
+                } else if (result.error) {
+                    resultText += `    ❌ Error: ${result.error}\n`;
+                }
+                resultText += '\n';
+                
+                liveResults.innerHTML += resultText;
+                liveResults.scrollTop = liveResults.scrollHeight;
+            }
+            else if (data.status === 'completed') {
+                const progress = 100;
+                progressFill.style.width = `${progress}%`;
+                progressFill.innerHTML = `${progress}%`;
+                progressFill.style.background = '#28a745';
+                
+                statusDiv.innerHTML = `✅ Completed! ${data.summary.verified_count}/${data.summary.total_urls} verified (${data.summary.success_rate}%)`;
+                
+                // Show final summary
+                document.getElementById('finalResults').innerHTML = `
+                    <div class="results success">
+                        <h3>📊 Final Results</h3>
+                        <p><strong>Total URLs:</strong> ${data.summary.total_urls}</p>
+                        <p><strong>Verified:</strong> ${data.summary.verified_count} ✅</p>
+                        <p><strong>Errors:</strong> ${data.summary.error_count} ❌</p>
+                        <p><strong>Success Rate:</strong> ${data.summary.success_rate}%</p>
+                    </div>
+                `;
+            }
+            else if (data.status === 'error') {
+                statusDiv.innerHTML = `❌ Error: ${data.error}`;
+            }
+        }
+
+        // Test API on page load
+        window.addEventListener('load', function() {
+            testAPI();
+        });
+    </script>
+</body>
+</html>
